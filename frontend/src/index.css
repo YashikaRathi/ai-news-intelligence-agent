@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    margin: 0;
+    font-family: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: #FFFFFF;
+    color: #0F172A;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Keep helper classes mapped to Inter for clean modern headlines */
+  .font-serif-headline {
+    font-family: 'Inter', 'Plus Jakarta Sans', sans-serif;
+    font-weight: 700;
+  }
+}
+
+/* Hide scrollbars for slick modern horizontal chips */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+
+
