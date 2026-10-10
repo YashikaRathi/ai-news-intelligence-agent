@@ -11,6 +11,8 @@ from app.services.prompts import (
     STORY_INTELLIGENCE_USER_PROMPT_TEMPLATE,
     SYSTEM_RAG_CHAT_PROMPT,
     RAG_CHAT_USER_PROMPT_TEMPLATE,
+    SYSTEM_CLAIM_EXTRACTION_PROMPT,
+    CLAIM_EXTRACTION_USER_PROMPT_TEMPLATE,
 )
 
 load_dotenv()
@@ -41,6 +43,17 @@ class BaseLLMProvider(ABC):
         context_articles: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """Generate grounded RAG answer based on retrieved article evidence context."""
+        pass
+
+    @abstractmethod
+    async def extract_article_claims(
+        self,
+        article_id: str,
+        title: str,
+        content: str,
+        url: str
+    ) -> Dict[str, Any]:
+        """Extract up to 5 verifiable factual claims from article content."""
         pass
 
 
@@ -226,6 +239,89 @@ class DemoLLMProvider(BaseLLMProvider):
             "is_demo": True
         }
 
+    async def extract_article_claims(
+        self,
+        article_id: str,
+        title: str,
+        content: str,
+        url: str
+    ) -> Dict[str, Any]:
+        text = (content or "").strip()
+        title_text = (title or "").strip()
+        combined_text = f"{title_text} {text}".strip()
+
+        if not combined_text:
+            return {
+                "article_id": article_id,
+                "article_title": title,
+                "article_url": url,
+                "claims": [],
+                "extraction_status": "missing_text",
+                "summary": "Article content is missing or empty.",
+                "is_demo": True
+            }
+
+        text_lower = combined_text.lower()
+
+        # Detect pure opinion / speculative / non-factual text
+        opinion_markers = [
+            "opinion:", "in my view", "i think", "in my opinion", "editorial:", "should be banned",
+            "the future is bright", "must realize", "i feel", "pure speculation", "i believe"
+        ]
+        is_opinion_only = any(marker in text_lower for marker in opinion_markers) and not any(
+            w in text_lower for w in ["announced", "reported", "said", "percent", "stipulated", "confirmed", "increased", "decreased", "launched", "unveiled", "signed"]
+        )
+
+        if is_opinion_only:
+            return {
+                "article_id": article_id,
+                "article_title": title,
+                "article_url": url,
+                "claims": [],
+                "extraction_status": "no_factual_claims_found",
+                "summary": "No checkable factual claims found in opinion or speculative text.",
+                "is_demo": True
+            }
+
+        # Deterministic factual claims extraction for demo mode
+        claims = []
+
+        # Claim 1: Headline factual claim
+        claims.append({
+            "claim_text": f"Core event reported: '{title_text}'",
+            "claim_type": "factual",
+            "entities": [title_text.split()[0]] if title_text else [],
+            "relevant_dates": None,
+            "quantities_or_locations": None,
+            "original_article_id": article_id,
+            "original_article_url": url,
+            "extraction_status": "success"
+        })
+
+        # Claim 2: Body text assertion if present
+        if len(text) > 20:
+            snippet = text[:150].strip()
+            claims.append({
+                "claim_text": f"Source reporting details: '{snippet}'",
+                "claim_type": "factual",
+                "entities": [],
+                "relevant_dates": None,
+                "quantities_or_locations": None,
+                "original_article_id": article_id,
+                "original_article_url": url,
+                "extraction_status": "success"
+            })
+
+        return {
+            "article_id": article_id,
+            "article_title": title,
+            "article_url": url,
+            "claims": claims[:5],
+            "extraction_status": "demo_mode",
+            "summary": f"Extracted {len(claims[:5])} simulated claim(s) in demo mode.",
+            "is_demo": True
+        }
+
 
 class OpenAILLMProvider(BaseLLMProvider):
     """Concrete OpenAI API implementation using httpx HTTP client."""
@@ -363,6 +459,89 @@ class OpenAILLMProvider(BaseLLMProvider):
             logger.error(f"Failed RAG query to OpenAI API: {exc}")
 
         return await DemoLLMProvider().answer_rag_question(question, context_articles)
+
+    async def extract_article_claims(
+        self,
+        article_id: str,
+        title: str,
+        content: str,
+        url: str
+    ) -> Dict[str, Any]:
+        if not self.api_key or self.api_key == "your_llm_api_key_here":
+            return await DemoLLMProvider().extract_article_claims(article_id, title, content, url)
+
+        combined = f"{title or ''}\n{content or ''}".strip()
+        if not combined:
+            return {
+                "article_id": article_id,
+                "article_title": title,
+                "article_url": url,
+                "claims": [],
+                "extraction_status": "missing_text",
+                "summary": "Article content is missing or empty.",
+                "is_demo": False
+            }
+
+        user_prompt = CLAIM_EXTRACTION_USER_PROMPT_TEMPLATE.format(
+            title=title or "",
+            content=content or ""
+        )
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": [
+                            {"role": "system", "content": SYSTEM_CLAIM_EXTRACTION_PROMPT},
+                            {"role": "user", "content": user_prompt}
+                        ],
+                        "response_format": {"type": "json_object"},
+                        "temperature": 0.1
+                    }
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    raw_content = data["choices"][0]["message"]["content"]
+                    parsed = json.loads(raw_content)
+
+                    status = parsed.get("extraction_status", "success")
+                    summary = parsed.get("summary", "Claims extracted successfully.")
+                    raw_claims = parsed.get("claims", [])
+
+                    formatted_claims = []
+                    for c in raw_claims[:5]:
+                        c_text = c.get("claim_text")
+                        if c_text:
+                            formatted_claims.append({
+                                "claim_text": c_text,
+                                "claim_type": c.get("claim_type", "factual"),
+                                "entities": c.get("entities", []),
+                                "relevant_dates": c.get("relevant_dates"),
+                                "quantities_or_locations": c.get("quantities_or_locations"),
+                                "original_article_id": article_id,
+                                "original_article_url": url,
+                                "extraction_status": "success"
+                            })
+
+                    return {
+                        "article_id": article_id,
+                        "article_title": title,
+                        "article_url": url,
+                        "claims": formatted_claims,
+                        "extraction_status": status,
+                        "summary": summary,
+                        "is_demo": False
+                    }
+        except Exception as exc:
+            logger.error(f"Failed claim extraction query to OpenAI API: {exc}")
+
+        return await DemoLLMProvider().extract_article_claims(article_id, title, content, url)
 
 
 

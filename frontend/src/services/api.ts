@@ -5,6 +5,7 @@ import {
   Story,
   StoryTimeline,
   StoryIntelligence,
+  VerificationResponse,
   SearchResult,
   ChatResponse,
 } from '../types';
@@ -70,6 +71,11 @@ export const getTimeline = async (storyId: string): Promise<StoryTimeline> => {
 
 export const getStoryIntelligence = async (storyId: string): Promise<StoryIntelligence> => {
   const response = await API.get<StoryIntelligence>(`/api/ai/stories/${storyId}/intelligence`);
+  return response.data;
+};
+
+export const getStoryVerification = async (storyId: string): Promise<VerificationResponse> => {
+  const response = await API.get<VerificationResponse>(`/api/ai/stories/${storyId}/verification`);
   return response.data;
 };
 

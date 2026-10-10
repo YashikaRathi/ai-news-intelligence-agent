@@ -3,9 +3,13 @@ from sqlalchemy.orm import Session
 from app.models.story import Story
 from app.models.article import Article
 from app.schemas.ai import StoryIntelligenceResponse
+from app.services.verification import VerificationService
 
 class IntelligenceService:
     """Service responsible for generating structured AI news intelligence."""
+
+    def __init__(self):
+        self.verification_service = VerificationService()
 
     async def analyze_story(self, story_id: str, db: Session) -> StoryIntelligenceResponse:
         from app.providers.llm import get_llm_provider
@@ -57,6 +61,13 @@ class IntelligenceService:
             articles=article_dicts
         )
 
+        # Generate NewsTrust AI verification details
+        verification_data = self.verification_service.verify_story(
+            story_id=story.id,
+            headline=story.title,
+            articles=article_dicts
+        )
+
         response = StoryIntelligenceResponse(
             story_id=story.id,
             headline=ai_raw.get("headline", story.title),
@@ -69,14 +80,20 @@ class IntelligenceService:
             sources=ai_raw.get("sources", []),
             evidence=ai_raw.get("evidence", []),
             source_comparison=ai_raw.get("source_comparison", []),
+            verification=verification_data,
             confidence=ai_raw.get("confidence", "High"),
             is_demo=ai_raw.get("is_demo", True)
         )
 
-        # Update story summary fields in database
+        # Update story summary & verification fields in database
         story.summary = response.what_happened
         story.what_changed = response.what_changed
         story.why_it_matters = response.why_it_matters
+        if hasattr(story, "trust_score"):
+            story.trust_score = verification_data.trust_score.score
+        if hasattr(story, "verification_status"):
+            story.verification_status = verification_data.trust_score.label
         db.commit()
 
         return response
+

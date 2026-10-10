@@ -71,6 +71,40 @@ export interface SourceComparisonItem {
   agreement: string;
 }
 
+export interface TrustScore {
+  score: number;
+  label: string;
+  corroboration_score: number;
+  publisher_credibility_score: number;
+  confidence_level: string;
+}
+
+export interface ClaimCheck {
+  claim_text: string;
+  status: string;
+  corroborating_sources: string[];
+  details: string;
+}
+
+export interface PublisherCredibility {
+  source_name: string;
+  credibility_tier: string;
+  rating: string;
+  domain_authority_score: number;
+}
+
+export interface VerificationResponse {
+  story_id: string;
+  headline: string;
+  trust_score: TrustScore;
+  publisher_credibility: PublisherCredibility[];
+  claim_checks: ClaimCheck[];
+  summary: string;
+  total_sources: number;
+  total_articles: number;
+  is_demo: boolean;
+}
+
 export interface StoryIntelligence {
   story_id: string;
   headline: string;
@@ -83,6 +117,7 @@ export interface StoryIntelligence {
   sources: string[];
   evidence: EvidenceItem[];
   source_comparison: SourceComparisonItem[];
+  verification?: VerificationResponse;
   confidence: string;
   is_demo: boolean;
 }
@@ -114,3 +149,4 @@ export interface HealthResponse {
   version: string;
   database: string;
 }
+

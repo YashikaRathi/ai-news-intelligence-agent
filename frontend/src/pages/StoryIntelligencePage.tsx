@@ -5,6 +5,8 @@ import { IntelligenceCard } from '../components/IntelligenceCard';
 import { Timeline } from '../components/Timeline';
 import { SourceComparison } from '../components/SourceComparison';
 import { ChatBox } from '../components/ChatBox';
+import { NewsTrustBadge } from '../components/NewsTrustBadge';
+import { VerificationPanel } from '../components/VerificationPanel';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { EmptyState } from '../components/EmptyState';
 import { ArrowLeft, Clock, Layers, ShieldCheck, Sparkles } from 'lucide-react';
@@ -83,6 +85,9 @@ export const StoryIntelligencePage: React.FC<StoryIntelligencePageProps> = ({ st
         </button>
 
         <div className="flex items-center gap-2">
+          {intelligence.verification && (
+            <NewsTrustBadge trustScore={intelligence.verification.trust_score} />
+          )}
           <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#EFF6FF] border border-[#60A5FA]/30 text-xs font-semibold text-[#2563EB]">
             <ShieldCheck className="w-4 h-4" /> Verified Evidence ({evidenceCount})
           </span>
@@ -161,6 +166,13 @@ export const StoryIntelligencePage: React.FC<StoryIntelligencePageProps> = ({ st
           />
         </div>
       </section>
+
+      {/* NEWSTRUST AI EVIDENCE & AUTHENTICITY VERIFICATION PANEL */}
+      {intelligence.verification && (
+        <section className="pt-2">
+          <VerificationPanel verification={intelligence.verification} />
+        </section>
+      )}
 
       {/* Main Content Layout: Left = Source Coverage & Timeline, Right = Ask the News */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-4">

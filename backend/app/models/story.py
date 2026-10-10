@@ -21,6 +21,8 @@ class Story(Base):
     latest_published_at = Column(DateTime, default=datetime.datetime.utcnow)
     article_count = Column(Integer, default=0)
     is_demo_data = Column(Boolean, default=False)
+    trust_score = Column(Integer, nullable=True, default=85)
+    verification_status = Column(String, nullable=True, default="Verified Multi-Source")
 
     # Relationships
     articles = relationship("Article", back_populates="story", cascade="all, delete-orphan")

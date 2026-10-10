@@ -73,3 +73,37 @@ INSTRUCTIONS:
 - Keep the answer concise but useful.
 """
 
+SYSTEM_CLAIM_EXTRACTION_PROMPT = (
+    "You are an expert news fact-checking assistant specialized in claim extraction.\n"
+    "Your objective is to extract up to five (5) important, independently checkable factual claims from the provided article text.\n"
+    "CRITICAL RULES:\n"
+    "1. Extract ONLY factual, empirical, or statistical assertions that can be objectively checked.\n"
+    "2. IGNORE opinions, personal impressions, speculation, predictions, rhetorical questions, and editorial commentary.\n"
+    "3. Preserve attribution and context. For instance, if an article states 'The CEO claimed revenue doubled', record the claim as 'CEO claimed revenue doubled', NOT 'Revenue doubled'.\n"
+    "4. Do NOT rewrite any claim into a stronger or broader statement than supported by the source text.\n"
+    "5. If no checkable factual claims exist (e.g. text is purely opinion or commentary), return an empty list of claims and set extraction_status to 'no_factual_claims_found'.\n"
+    "6. Respond strictly in valid JSON format."
+)
+
+CLAIM_EXTRACTION_USER_PROMPT_TEMPLATE = """
+Article Title: {title}
+Article Text:
+{content}
+
+Task: Extract up to 5 checkable factual claims. Return JSON with structure:
+{{
+  "extraction_status": "success",
+  "summary": "Brief summary of claims extracted",
+  "claims": [
+    {{
+      "claim_text": "Exact or attributed factual claim statement",
+      "claim_type": "factual | statistical | attributed_quote | event | policy",
+      "entities": ["Entity1", "Entity2"],
+      "relevant_dates": "Dates mentioned or null",
+      "quantities_or_locations": "Quantities or locations mentioned or null"
+    }}
+  ]
+}}
+"""
+
+

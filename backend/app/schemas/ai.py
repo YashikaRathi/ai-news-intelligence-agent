@@ -2,6 +2,8 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.verification import VerificationResponse
+
 class EvidenceItem(BaseModel):
     article_id: str
     source_name: str
@@ -36,6 +38,7 @@ class StoryIntelligenceResponse(BaseModel):
     sources: List[str] = []
     evidence: List[EvidenceItem] = []
     source_comparison: List[SourceComparisonItem] = []
+    verification: Optional[VerificationResponse] = None
     confidence: str = "High"
     is_demo: bool = False
 
