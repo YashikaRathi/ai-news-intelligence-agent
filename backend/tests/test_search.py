@@ -34,14 +34,21 @@ MOCK_NEPAL_FLOOD_NEWSAPI = {
 }
 
 
-def test_search_api_live_discovery():
-    """Test searching for arbitrary topic 'Nepal flood' triggers NewsAPI live discovery and returns articles & stories."""
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.json.return_value = MOCK_NEPAL_FLOOD_NEWSAPI
+import httpx
 
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-        mock_get.return_value = mock_resp
+def test_search_api_live_discovery(monkeypatch):
+    """Test searching for arbitrary topic 'Nepal flood' triggers NewsAPI live discovery and returns articles & stories."""
+    monkeypatch.setenv("NEWS_API_KEY", "test_mock_newsapi_key")
+    monkeypatch.setenv("NEWS_PROVIDER", "newsapi")
+    monkeypatch.setenv("DEMO_MODE", "false")
+
+    mock_resp = httpx.Response(status_code=200, json=MOCK_NEPAL_FLOOD_NEWSAPI)
+
+    mock_client = AsyncMock()
+    mock_client.get.return_value = mock_resp
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        mock_client.__aenter__.return_value = mock_client
         response = client.get("/api/search?q=Nepal%20flood")
         assert response.status_code == 200
         data = response.json()

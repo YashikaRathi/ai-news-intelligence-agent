@@ -7,6 +7,8 @@ import {
   StoryIntelligence,
   SearchResult,
   ChatResponse,
+  VerificationResult,
+  StoryVerificationSummary,
 } from '../types';
 
 const getBaseURL = () => {
@@ -84,6 +86,23 @@ export const askNews = async (storyId: string | null, question: string): Promise
   const response = await API.post<ChatResponse>('/api/ai/chat', {
     story_id: storyId,
     question,
+  });
+  return response.data;
+};
+
+export const getArticleVerification = async (articleId: string): Promise<VerificationResult> => {
+  const response = await API.get<VerificationResult>(`/api/verification/article/${articleId}`);
+  return response.data;
+};
+
+export const getStoryVerification = async (storyId: string): Promise<StoryVerificationSummary> => {
+  const response = await API.get<StoryVerificationSummary>(`/api/verification/story/${storyId}`);
+  return response.data;
+};
+
+export const refreshVerification = async (storyId?: string): Promise<any> => {
+  const response = await API.post('/api/verification/refresh', null, {
+    params: { story_id: storyId },
   });
   return response.data;
 };

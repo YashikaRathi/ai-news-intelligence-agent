@@ -20,15 +20,34 @@ Duplicate Detection (`DeduplicationService`)
 Story Event Clustering (`ClusteringService`)
    │
    ▼
+Credibility & Fact Check Verification (`CredibilityVerificationService`)
+   │
+   ▼
 SQLite DB Persistence (`articles` & `stories` tables)
    │
    ▼
 AI Analysis (`IntelligenceService` & `BaseLLMProvider`)
-(What Happened + What Changed + Why It Matters + Source Comparison + Evidence Citations)
+(What Happened + What Changed + Why It Matters + Source Comparison + Verification Findings)
    │
    ▼
 RAG Search ("Ask the News") (`RAGService` & `POST /api/ai/chat`)
 ```
+
+---
+
+## Fake News Detection & Credibility Verification Layer
+
+The project features a **Credibility & Fact-Check Verification Layer** (`CredibilityVerificationService`) integrated into the news intelligence pipeline to assist users in evaluating news reliability:
+
+### 1. Verification Features
+- **Publisher Domain Credibility Registry**: Evaluates publisher domain reputation (`high_credibility`, `medium_credibility`, `low_credibility`, `unverified_publisher`) against a configurable organizational registry. Unknown domains remain unverified rather than assumed unreliable.
+- **External Fact-Check Search (Google Fact Check Tools API)**: Optionally queries third-party fact-checking publisher databases to match claims against published fact-check reviews (`verified_by_existing_fact_check`, `disputed_by_existing_fact_check`, `no_matching_fact_check`, `not_checked`).
+- **Cross-Source Claim Discrepancy Engine**: Compares claims and timestamp developments across outlets in a story cluster to classify consensus (`unanimous_consensus`, `conflicting_reports`, `single_source_only`, `insufficient_evidence`).
+
+### 2. Methodological Principles & Limitations
+- **Reputation $\neq$ Claim Proof**: High publisher credibility reflects editorial standards, not automatic proof that an individual claim is true.
+- **Missing Fact-Check $\neq$ Falsehood**: The absence of a matching third-party fact-check does not prove or disprove a claim.
+- **Neutral Grounded Terminology**: Avoids binary "Fake / Real" labels, presenting evidence-grounded findings with explicit limitations.
 
 ---
 

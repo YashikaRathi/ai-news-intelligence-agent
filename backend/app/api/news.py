@@ -96,9 +96,15 @@ async def get_news(
     db.commit()
 
     # 6. Persist Articles in DB
+    from app.services.credibility import CredibilityVerificationService
+    cred_service = CredibilityVerificationService()
+
     existing_ids = {a.id for a in db.query(Article.id).all()}
     for a_data in clustered_articles:
         if a_data["id"] not in existing_ids:
+            domain = cred_service.extract_domain(a_data.get("url") or a_data.get("canonical_url"))
+            rating = cred_service.evaluate_publisher(domain)
+
             article_obj = Article(
                 id=a_data["id"],
                 title=a_data["title"],
@@ -112,6 +118,9 @@ async def get_news(
                 image_url=a_data.get("image_url"),
                 published_at=a_data.get("published_at"),
                 topic=a_data.get("topic"),
+                publisher_domain=domain,
+                credibility_status=rating.rating,
+                fact_check_status="not_checked",
                 is_duplicate=a_data.get("is_duplicate", False),
                 duplicate_of_id=a_data.get("duplicate_of_id"),
                 story_id=a_data.get("story_id"),

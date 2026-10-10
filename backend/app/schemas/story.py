@@ -22,6 +22,8 @@ class StoryResponse(StoryBase):
     latest_published_at: Optional[datetime] = None
     article_count: int
     is_demo_data: bool = False
+    discrepancy_status: Optional[str] = "insufficient_evidence"
+    fact_check_status: Optional[str] = "not_checked"
     articles: List[ArticleResponse] = []
 
     model_config = ConfigDict(from_attributes=True)

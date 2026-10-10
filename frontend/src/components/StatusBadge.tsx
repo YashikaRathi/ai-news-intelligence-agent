@@ -44,3 +44,72 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ apiStatus, isDemo = tr
   );
 };
 
+export const CredibilityBadge: React.FC<{ status?: string }> = ({ status }) => {
+  switch (status) {
+    case 'high_credibility':
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          High Credibility
+        </span>
+      );
+    case 'medium_credibility':
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+          Medium Credibility
+        </span>
+      );
+    case 'low_credibility':
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+          Caution Advised
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+          Unverified Publisher
+        </span>
+      );
+  }
+};
+
+export const VerificationBadge: React.FC<{ status?: string }> = ({ status }) => {
+  switch (status) {
+    case 'verified_by_existing_fact_check':
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+          Existing Fact-Check Found
+        </span>
+      );
+    case 'disputed_by_existing_fact_check':
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-800 border border-rose-300">
+          Disputed Claim
+        </span>
+      );
+    case 'conflicting_reports':
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+          Conflicting Reports
+        </span>
+      );
+    case 'unanimous_consensus':
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800 border border-blue-300">
+          Unanimous Consensus
+        </span>
+      );
+    case 'single_source_only':
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-300">
+          Single Source Reporting
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-50 text-slate-500 border border-slate-200">
+          No Matching Fact-Check Found
+        </span>
+      );
+  }
+};

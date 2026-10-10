@@ -1,5 +1,6 @@
 import React from 'react';
 import { SourceComparisonItem } from '../types';
+import { CredibilityBadge } from './StatusBadge';
 import { ExternalLink, Bookmark, AlertCircle, CheckCircle2, Globe } from 'lucide-react';
 
 interface SourceComparisonProps {
@@ -36,9 +37,12 @@ export const SourceComparison: React.FC<SourceComparisonProps> = ({ items }) => 
             className="bg-white border border-[#E2E8F0] hover:border-[#60A5FA] rounded-xl p-5 space-y-3 shadow-sm transition-all"
           >
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E8F0] pb-2.5">
-              <span className="px-2.5 py-0.5 rounded-md text-xs font-bold bg-[#EFF6FF] text-[#2563EB] border border-[#60A5FA]/30 uppercase tracking-wider">
-                {item.source_name}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-md text-xs font-bold bg-[#EFF6FF] text-[#2563EB] border border-[#60A5FA]/30 uppercase tracking-wider">
+                  {item.source_name}
+                </span>
+                <CredibilityBadge status="high_credibility" />
+              </div>
               <a
                 href={item.url}
                 target="_blank"

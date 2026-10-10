@@ -22,6 +22,9 @@ class ArticleResponse(ArticleBase):
     story_id: Optional[str] = None
     is_duplicate: bool = False
     duplicate_of_id: Optional[str] = None
+    publisher_domain: Optional[str] = None
+    credibility_status: Optional[str] = "unverified_publisher"
+    fact_check_status: Optional[str] = "not_checked"
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

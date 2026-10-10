@@ -8,7 +8,7 @@ from app.db.base import Base
 import app.models  # Ensures models are registered with Base
 
 from app.schemas.health import HealthResponse
-from app.api import news_router, stories_router, search_router, ai_router
+from app.api import news_router, stories_router, search_router, ai_router, verification_router
 
 load_dotenv()
 
@@ -57,6 +57,7 @@ app.include_router(news_router, prefix="/api")
 app.include_router(stories_router, prefix="/api")
 app.include_router(search_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
+app.include_router(verification_router, prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn

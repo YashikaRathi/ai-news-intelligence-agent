@@ -24,6 +24,8 @@ class SourceComparisonItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+from app.schemas.verification import FactCheckItem
+
 class StoryIntelligenceResponse(BaseModel):
     story_id: str
     headline: str
@@ -36,6 +38,9 @@ class StoryIntelligenceResponse(BaseModel):
     sources: List[str] = []
     evidence: List[EvidenceItem] = []
     source_comparison: List[SourceComparisonItem] = []
+    discrepancy_status: str = "insufficient_evidence"
+    fact_checks: List[FactCheckItem] = []
+    verification_summary: Optional[Dict[str, Any]] = None
     confidence: str = "High"
     is_demo: bool = False
 

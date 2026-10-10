@@ -57,6 +57,11 @@ class IntelligenceService:
             articles=article_dicts
         )
 
+        # Run verification check for story cluster
+        from app.services.credibility import CredibilityVerificationService
+        cred_service = CredibilityVerificationService()
+        verification_summary_obj = await cred_service.verify_story_cluster(story.id, article_dicts)
+
         response = StoryIntelligenceResponse(
             story_id=story.id,
             headline=ai_raw.get("headline", story.title),
@@ -69,6 +74,9 @@ class IntelligenceService:
             sources=ai_raw.get("sources", []),
             evidence=ai_raw.get("evidence", []),
             source_comparison=ai_raw.get("source_comparison", []),
+            discrepancy_status=verification_summary_obj.discrepancy_status,
+            fact_checks=verification_summary_obj.fact_checks,
+            verification_summary=verification_summary_obj.model_dump(),
             confidence=ai_raw.get("confidence", "High"),
             is_demo=ai_raw.get("is_demo", True)
         )
@@ -77,6 +85,7 @@ class IntelligenceService:
         story.summary = response.what_happened
         story.what_changed = response.what_changed
         story.why_it_matters = response.why_it_matters
+        story.discrepancy_status = verification_summary_obj.discrepancy_status
         db.commit()
 
         return response

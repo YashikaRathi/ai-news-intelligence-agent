@@ -14,6 +14,10 @@ class Story(Base):
     topic = Column(String, default="General", index=True)
     category = Column(String, default="General", index=True)
 
+    # Verification metadata
+    discrepancy_status = Column(String, default="insufficient_evidence", index=True)
+    fact_check_status = Column(String, default="not_checked", index=True)
+
     # Timestamps & Cluster info
     first_seen = Column(DateTime, default=datetime.datetime.utcnow)
     last_updated = Column(DateTime, default=datetime.datetime.utcnow)
