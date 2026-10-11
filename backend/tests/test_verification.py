@@ -18,23 +18,26 @@ def test_extract_domain(service):
 def test_evaluate_publisher_known_and_unknown(service):
     # Test known high-credibility domain
     bbc_rating = service.evaluate_publisher("bbc.com")
+    assert bbc_rating.assessment_status == "rated"
     assert bbc_rating.rating == "high_credibility"
     assert "bbc.com" in bbc_rating.domain
 
     # Test subdomain fallback
     sub_bbc = service.evaluate_publisher("news.bbc.com")
+    assert sub_bbc.assessment_status == "rated"
     assert sub_bbc.rating == "high_credibility"
 
-    # Test unknown domain
+    # Test unknown domain: must be marked "not_assessed", NOT fake or unreliable
     unknown_rating = service.evaluate_publisher("randomuntrackeddomain.xyz")
-    assert unknown_rating.rating == "unverified_publisher"
-    assert "not present in the pre-configured credibility registry" in unknown_rating.explanation
+    assert unknown_rating.assessment_status == "not_assessed"
+    assert unknown_rating.rating == "not_assessed"
+    assert "not currently indexed" in unknown_rating.explanation or "not assessed" in unknown_rating.explanation.lower()
 
 @pytest.mark.asyncio
 async def test_search_fact_checks_missing_key(service):
     service.fact_check_api_key = ""
     status, fact_checks = await service.search_fact_checks("Some Headline")
-    assert status == "not_checked"
+    assert status == "Not checked"
     assert fact_checks == []
 
 @pytest.mark.asyncio
@@ -65,17 +68,18 @@ async def test_search_fact_checks_mocked_success(service):
     with patch("httpx.AsyncClient", return_value=mock_client):
         mock_client.__aenter__.return_value = mock_client
         status, fact_checks = await service.search_fact_checks("Claim headline")
-        assert status == "disputed_by_existing_fact_check"
+        assert status == "Fact-check rated FALSE"
         assert len(fact_checks) == 1
         assert fact_checks[0].fact_check_publisher == "FactCheck.org"
         assert fact_checks[0].original_rating == "False"
-        assert fact_checks[0].normalized_status == "disputed_by_existing_fact_check"
+        assert fact_checks[0].normalized_status == "Fact-check rated FALSE"
 
 def test_analyze_cross_source_discrepancies(service):
     # Single source
     single_art = [{"title": "Single headline", "source_name": "BBC News"}]
     status, findings = service.analyze_cross_source_discrepancies(single_art)
-    assert status == "single_source_only"
+    assert status == "Insufficient evidence"
+    assert len(findings["single_source_claims"]) == 1
 
     # Multiple aligned sources
     multi_arts_aligned = [
@@ -83,7 +87,7 @@ def test_analyze_cross_source_discrepancies(service):
         {"title": "Global Tech Summit Announced in London Today", "source_name": "The Guardian"}
     ]
     status_aligned, findings_aligned = service.analyze_cross_source_discrepancies(multi_arts_aligned)
-    assert status_aligned == "unanimous_consensus"
+    assert status_aligned == "Unanimous consensus"
 
     # Divergent sources
     multi_arts_divergent = [
@@ -91,4 +95,4 @@ def test_analyze_cross_source_discrepancies(service):
         {"title": "Stock Market Experiences Minor Fluctuations", "source_name": "Bloomberg"}
     ]
     status_div, findings_div = service.analyze_cross_source_discrepancies(multi_arts_divergent)
-    assert status_div == "conflicting_reports"
+    assert status_div == "Conflicting reports"

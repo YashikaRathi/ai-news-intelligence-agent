@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
@@ -7,6 +8,7 @@ from app.models.article import Article
 from app.models.story import Story
 from app.schemas.verification import VerificationResult, StoryVerificationSummary
 from app.services.credibility import CredibilityVerificationService
+from app.services.notification import NotificationService
 
 router = APIRouter(prefix="/verification", tags=["Credibility & Fact Check Verification"])
 
@@ -25,17 +27,17 @@ async def get_article_verification(article_id: str, db: Session = Depends(get_db
         "url": art.url,
         "canonical_url": art.canonical_url,
         "source_name": art.source_name,
-        "published_at": art.published_at
+        "published_at": art.published_at.isoformat() if art.published_at else None
     }
 
     result = await credibility_service.verify_article(art_dict)
     
-    # Update DB fields if changed
-    if art.credibility_status != result.credibility_status or art.fact_check_status != result.fact_check_status:
-        art.publisher_domain = result.publisher_domain
-        art.credibility_status = result.credibility_status
-        art.fact_check_status = result.fact_check_status
-        db.commit()
+    # Update DB fields
+    art.publisher_domain = result.publisher_domain
+    art.credibility_status = result.publisher_credibility_status
+    art.fact_check_status = result.overall_status
+    art.verified_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.commit()
 
     return result
 
@@ -55,17 +57,29 @@ async def get_story_verification(story_id: str, db: Session = Depends(get_db)):
             "url": a.url,
             "canonical_url": a.canonical_url,
             "source_name": a.source_name,
-            "published_at": a.published_at
+            "published_at": a.published_at.isoformat() if a.published_at else None,
+            "is_duplicate": a.is_duplicate
         }
         for a in articles
     ]
 
     summary = await credibility_service.verify_story_cluster(story_id, articles_dict)
     
-    # Update story DB model
-    if story.discrepancy_status != summary.discrepancy_status:
+    # Check if verification status materially changed to notify readers
+    old_status = story.fact_check_status
+    if story.discrepancy_status != summary.discrepancy_status or story.fact_check_status != summary.overall_status:
         story.discrepancy_status = summary.discrepancy_status
+        story.fact_check_status = summary.overall_status
         db.commit()
+
+        if old_status != summary.overall_status and summary.overall_status not in ["Not checked", "insufficient_evidence", "not_checked"]:
+            NotificationService.notify_verification_change(
+                db=db,
+                story_id=story.id,
+                story_title=story.title,
+                new_status=summary.overall_status,
+                reason=summary.status_reason
+            )
 
     return summary
 
@@ -89,12 +103,14 @@ async def refresh_verification(
                 "url": a.url,
                 "canonical_url": a.canonical_url,
                 "source_name": a.source_name,
-                "published_at": a.published_at
+                "published_at": a.published_at.isoformat() if a.published_at else None,
+                "is_duplicate": a.is_duplicate
             }
             for a in articles
         ]
         summary = await credibility_service.verify_story_cluster(story_id, articles_dict)
         story.discrepancy_status = summary.discrepancy_status
+        story.fact_check_status = summary.overall_status
         db.commit()
 
         return {
@@ -117,12 +133,14 @@ async def refresh_verification(
                 "url": a.url,
                 "canonical_url": a.canonical_url,
                 "source_name": a.source_name,
-                "published_at": a.published_at
+                "published_at": a.published_at.isoformat() if a.published_at else None,
+                "is_duplicate": a.is_duplicate
             }
             for a in arts
         ]
         sum_res = await credibility_service.verify_story_cluster(st.id, arts_dict)
         st.discrepancy_status = sum_res.discrepancy_status
+        st.fact_check_status = sum_res.overall_status
         refreshed_count += 1
 
     db.commit()

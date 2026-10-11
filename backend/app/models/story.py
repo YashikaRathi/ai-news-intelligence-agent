@@ -19,10 +19,10 @@ class Story(Base):
     fact_check_status = Column(String, default="not_checked", index=True)
 
     # Timestamps & Cluster info
-    first_seen = Column(DateTime, default=datetime.datetime.utcnow)
-    last_updated = Column(DateTime, default=datetime.datetime.utcnow)
-    earliest_published_at = Column(DateTime, default=datetime.datetime.utcnow)
-    latest_published_at = Column(DateTime, default=datetime.datetime.utcnow)
+    first_seen = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    last_updated = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    earliest_published_at = Column(DateTime, nullable=True)
+    latest_published_at = Column(DateTime, nullable=True)
     article_count = Column(Integer, default=0)
     is_demo_data = Column(Boolean, default=False)
 

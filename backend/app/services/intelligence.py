@@ -86,6 +86,7 @@ class IntelligenceService:
         story.what_changed = response.what_changed
         story.why_it_matters = response.why_it_matters
         story.discrepancy_status = verification_summary_obj.discrepancy_status
+        story.fact_check_status = verification_summary_obj.overall_status
         db.commit()
 
         return response

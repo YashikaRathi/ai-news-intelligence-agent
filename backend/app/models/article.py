@@ -16,12 +16,15 @@ class Article(Base):
     source_name = Column(String, nullable=False, index=True)
     author = Column(String, nullable=True)
     image_url = Column(String, nullable=True)
-    published_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    published_at = Column(DateTime, nullable=True, index=True)
+    source_updated_at = Column(DateTime, nullable=True)
+    ingested_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    verified_at = Column(DateTime, nullable=True)
     topic = Column(String, nullable=True, index=True)
 
     # Verification metadata
     publisher_domain = Column(String, nullable=True, index=True)
-    credibility_status = Column(String, default="unverified_publisher", index=True)
+    credibility_status = Column(String, default="not_assessed", index=True)
     fact_check_status = Column(String, default="not_checked", index=True)
 
     # Duplicate detection tracking
@@ -33,5 +36,5 @@ class Article(Base):
     story = relationship("Story", back_populates="articles")
 
     # Ingestion metadata
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     checksum = Column(String, nullable=True, index=True)

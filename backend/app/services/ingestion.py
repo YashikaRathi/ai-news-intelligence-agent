@@ -61,18 +61,51 @@ class IngestionService:
         return hashlib.sha256(canonical_url.encode("utf-8")).hexdigest()[:16]
 
     @staticmethod
-    def parse_timestamp(date_val: Any) -> datetime:
-        """Parse datetime object or ISO date string into UTC datetime."""
+    def parse_timestamp(date_val: Any) -> Optional[datetime]:
+        """Parse datetime object, ISO date string, or RFC 822 string into timezone-aware UTC datetime.
+        
+        Explicit Policy for Naive Datetimes:
+        When an ingested source timestamp contains no explicit timezone offset:
+        - Per standard internet news syndication and API conventions, naive timestamps from providers
+          are interpreted as UTC.
+        - The timestamp is assigned timezone.utc without altering the wall-clock value.
+        
+        Returns None if date_val is None, empty, or unparseable. NEVER returns current time.
+        """
+        if date_val is None:
+            return None
+
         if isinstance(date_val, datetime):
-            return date_val.astimezone(timezone.utc) if date_val.tzinfo else date_val
-        if isinstance(date_val, str) and date_val:
+            if date_val.tzinfo is not None:
+                return date_val.astimezone(timezone.utc)
+            return date_val.replace(tzinfo=timezone.utc)
+
+        if isinstance(date_val, str):
+            clean_val = date_val.strip()
+            if not clean_val:
+                return None
+
+            # 1. Standard ISO format strings (handling Z and explicit offsets)
             try:
-                # Handle standard ISO format strings
-                dt = datetime.fromisoformat(date_val.replace("Z", "+00:00"))
-                return dt.astimezone(timezone.utc) if dt.tzinfo else dt
+                iso_str = clean_val.replace("Z", "+00:00")
+                dt = datetime.fromisoformat(iso_str)
+                if dt.tzinfo is not None:
+                    return dt.astimezone(timezone.utc)
+                return dt.replace(tzinfo=timezone.utc)
             except Exception:
                 pass
-        return datetime.now(timezone.utc)
+
+            # 2. RFC 2822 / email timestamp format
+            try:
+                import email.utils
+                parsed_tuple = email.utils.parsedate_tz(clean_val)
+                if parsed_tuple:
+                    ts = email.utils.mktime_tz(parsed_tuple)
+                    return datetime.fromtimestamp(ts, tz=timezone.utc)
+            except Exception:
+                pass
+
+        return None
 
     def normalize_article(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
         """Normalize raw RSS article data dictionary into structured canonical format."""
@@ -84,6 +117,7 @@ class IngestionService:
 
         description = self.clean_html(raw_data.get("description", ""))
         published_at = self.parse_timestamp(raw_data.get("published_at"))
+        source_updated_at = self.parse_timestamp(raw_data.get("source_updated_at"))
 
         return {
             "id": article_id,
@@ -97,6 +131,7 @@ class IngestionService:
             "author": self.clean_html(raw_data.get("author")) or None,
             "image_url": raw_data.get("image_url"),
             "published_at": published_at,
+            "source_updated_at": source_updated_at,
             "topic": raw_data.get("topic", "General"),
             "checksum": article_id,
         }

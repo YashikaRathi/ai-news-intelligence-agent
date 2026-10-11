@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Header } from './components/Header';
+import { NotificationCenter } from './components/NotificationCenter';
 import { DashboardPage } from './pages/DashboardPage';
 import { SearchPage } from './pages/SearchPage';
 import { StoryIntelligencePage } from './pages/StoryIntelligencePage';
 import { StoryGrid } from './components/StoryGrid';
 import { LoadingSkeleton } from './components/LoadingSkeleton';
 import { EmptyState } from './components/EmptyState';
-import { getHealth, getStories } from './services/api';
+import { getHealth, getStories, getNotifications } from './services/api';
 import { Story } from './types';
 import { Sparkles, Layers } from 'lucide-react';
 
@@ -18,6 +19,8 @@ export function App() {
   const [apiStatus, setApiStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   const [stories, setStories] = useState<Story[]>([]);
   const [loadingStories, setLoadingStories] = useState<boolean>(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
   // Health Check: Header status depends ONLY on GET /health 200 OK
   const checkHealth = async () => {
@@ -33,9 +36,22 @@ export function App() {
     }
   };
 
+  const fetchUnreadCount = async () => {
+    try {
+      const data = await getNotifications();
+      setUnreadCount(data.unread_count || 0);
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     checkHealth();
-    const interval = setInterval(checkHealth, 15000);
+    fetchUnreadCount();
+    const interval = setInterval(() => {
+      checkHealth();
+      fetchUnreadCount();
+    }, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -82,6 +98,16 @@ export function App() {
         isDemo={true}
         onCategorySelect={handleSearchTopic}
         selectedCategory={selectedCategory}
+        unreadCount={unreadCount}
+        onOpenNotifications={() => setIsNotificationOpen(true)}
+      />
+
+      {/* Persistent In-App Notification Center Drawer */}
+      <NotificationCenter
+        isOpen={isNotificationOpen}
+        onClose={() => setIsNotificationOpen(false)}
+        onSelectStory={handleSelectStory}
+        onUnreadCountChange={setUnreadCount}
       />
 
       {/* Main Content Area */}

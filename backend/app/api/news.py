@@ -11,6 +11,8 @@ from app.services.ingestion import IngestionService
 from app.services.deduplication import DeduplicationService
 from app.services.clustering import ClusteringService
 
+from app.services.search import SearchService
+
 router = APIRouter(prefix="/news", tags=["News Ingestion & Articles"])
 
 ingestion_service = IngestionService()
@@ -21,6 +23,7 @@ clustering_service = ClusteringService()
 async def get_news(
     topic: Optional[str] = Query(None, description="Topic filter (e.g. artificial intelligence)"),
     sort: Optional[str] = Query("latest", description="Sort or mode: latest, popular, top"),
+    freshness: Optional[str] = Query("all", description="Freshness filter: 1h, 6h, 24h, 7d, all"),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
@@ -117,10 +120,11 @@ async def get_news(
                 author=a_data.get("author"),
                 image_url=a_data.get("image_url"),
                 published_at=a_data.get("published_at"),
+                source_updated_at=a_data.get("source_updated_at"),
                 topic=a_data.get("topic"),
                 publisher_domain=domain,
-                credibility_status=rating.rating,
-                fact_check_status="not_checked",
+                credibility_status=rating.assessment_status,
+                fact_check_status="Not checked",
                 is_duplicate=a_data.get("is_duplicate", False),
                 duplicate_of_id=a_data.get("duplicate_of_id"),
                 story_id=a_data.get("story_id"),
@@ -129,13 +133,29 @@ async def get_news(
             db.add(article_obj)
             existing_ids.add(a_data["id"])
 
+            # Send topic notification for fresh non-duplicate articles
+            if not a_data.get("is_duplicate"):
+                from app.services.notification import NotificationService
+                NotificationService.notify_topic_article(
+                    db=db,
+                    article_id=a_data["id"],
+                    article_title=a_data["title"],
+                    topic=a_data.get("topic") or "General",
+                    source_name=a_data["source_name"]
+                )
+
     db.commit()
 
-    # Query latest articles from DB
-    query = db.query(Article)
-    if topic:
-        query = query.filter(Article.topic.ilike(f"%{topic}%"))
-    
+    # Query latest non-duplicate articles from DB
+    query = db.query(Article).filter(Article.is_duplicate.is_(False))
+    if topic and topic.strip() and topic.strip().lower() not in ["general", "all", "news"]:
+        query = query.filter(Article.topic.ilike(f"%{topic.strip()}%"))
+
+    cutoff = SearchService.get_freshness_cutoff(freshness)
+    if cutoff:
+        query = query.filter(Article.published_at.isnot(None), Article.published_at >= cutoff)
+
+    # Sort strictly by original publication timestamp (newest first)
     results = query.order_by(Article.published_at.desc()).limit(limit).all()
     return results
 
@@ -143,9 +163,10 @@ async def get_news(
 @router.get("/top", response_model=List[ArticleResponse])
 async def get_top_news(
     topic: Optional[str] = Query(None, description="Topic filter"),
+    freshness: Optional[str] = Query("all", description="Freshness filter: 1h, 6h, 24h, 7d, all"),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
     """Fetch top/trending headlines."""
-    return await get_news(topic=topic, sort="top", limit=limit, db=db)
+    return await get_news(topic=topic, sort="top", freshness=freshness, limit=limit, db=db)
 

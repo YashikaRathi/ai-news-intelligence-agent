@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Story, Article } from '../types';
+import { Story, Article, FreshnessOption } from '../types';
 import { getStories, getNews } from '../services/api';
 import { StoryCard } from '../components/StoryCard';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { EmptyState } from '../components/EmptyState';
-import { ArrowRight, Search, Sparkles, Layers } from 'lucide-react';
+import { VerificationBadge } from '../components/StatusBadge';
+import { formatRelativeTime, getTimestampTooltip } from '../utils/time';
+import { ArrowRight, Search, Sparkles, Layers, Clock } from 'lucide-react';
 
 
 interface DashboardPageProps {
@@ -17,6 +19,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onSelectStory, onS
   const [stories, setStories] = useState<Story[]>([]);
   const [liveArticles, setLiveArticles] = useState<Article[]>([]);
   const [activeSort, setActiveSort] = useState<'latest' | 'popular' | 'top'>('latest');
+  const [freshness, setFreshness] = useState<FreshnessOption>('all');
   const [searchInputValue, setSearchInputValue] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,14 +34,26 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onSelectStory, onS
     { label: 'Climate', topic: 'climate' },
   ];
 
-  const loadData = async (topic?: string, sortMode: 'latest' | 'popular' | 'top' = activeSort) => {
+  const freshnessOptions: { label: string; value: FreshnessOption }[] = [
+    { label: 'All available news', value: 'all' },
+    { label: 'Last hour', value: '1h' },
+    { label: 'Last 6 hours', value: '6h' },
+    { label: 'Last 24 hours', value: '24h' },
+    { label: 'Last 7 days', value: '7d' },
+  ];
+
+  const loadData = async (
+    topic?: string,
+    sortMode: 'latest' | 'popular' | 'top' = activeSort,
+    freshnessFilter: FreshnessOption = freshness
+  ) => {
     setLoading(true);
     setError(null);
 
     const activeTopic = topic !== undefined ? topic : selectedCategory;
 
     try {
-      const storiesData = await getStories(activeTopic, 25);
+      const storiesData = await getStories(activeTopic, 25, freshnessFilter, 'latest');
       setStories(storiesData);
     } catch (dbErr: any) {
       console.warn('SQLite story fetch warning:', dbErr);
@@ -47,11 +62,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onSelectStory, onS
     }
 
     try {
-      const articlesData = await getNews(activeTopic || 'artificial intelligence', 25, sortMode);
+      const articlesData = await getNews(activeTopic || 'artificial intelligence', 25, sortMode, freshnessFilter);
       if (articlesData && articlesData.length > 0) {
         setLiveArticles(articlesData);
-        const updatedStories = await getStories(activeTopic, 25);
+        const updatedStories = await getStories(activeTopic, 25, freshnessFilter, 'latest');
         setStories(updatedStories);
+      } else {
+        setLiveArticles([]);
       }
     } catch (ingestErr: any) {
       console.warn('News ingestion fetch warning:', ingestErr);
@@ -59,12 +76,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onSelectStory, onS
   };
 
   useEffect(() => {
-    loadData(selectedCategory);
+    loadData(selectedCategory, activeSort, freshness);
   }, [selectedCategory]);
 
   const handleSortChange = (newSort: 'latest' | 'popular' | 'top') => {
     setActiveSort(newSort);
-    loadData(selectedCategory, newSort);
+    loadData(selectedCategory, newSort, freshness);
+  };
+
+  const handleFreshnessChange = (newFreshness: FreshnessOption) => {
+    setFreshness(newFreshness);
+    loadData(selectedCategory, activeSort, newFreshness);
   };
 
   const handleSearchFormSubmit = (e: React.FormEvent) => {
@@ -141,40 +163,70 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onSelectStory, onS
         </div>
       </section>
 
-      {/* 3. FEED SORT SWITCHER BAR */}
-      <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-4">
-        <div className="flex items-center gap-2">
-          <Layers className="w-5 h-5 text-[#2563EB]" />
-          <h2 className="text-xl font-extrabold text-[#0F172A] tracking-tight">
-            Today's Intelligence
-          </h2>
+      {/* 3. FRESHNESS & FEED CONTROLS BAR */}
+      <div className="space-y-3 border-b border-[#E2E8F0] pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Layers className="w-5 h-5 text-[#2563EB]" />
+            <h2 className="text-xl font-extrabold text-[#0F172A] tracking-tight">
+              Today's Intelligence
+            </h2>
+            <span className="text-[11px] font-semibold text-[#64748B] bg-[#F1F5F9] px-2.5 py-0.5 rounded-full">
+              Publication time: Newest first
+            </span>
+          </div>
+
+          {/* Sort Switcher */}
+          <div className="flex items-center bg-[#F7FAFF] p-1 rounded-xl border border-[#E2E8F0] text-xs font-semibold text-[#0F172A]">
+            <button
+              onClick={() => handleSortChange('latest')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                activeSort === 'latest' ? 'bg-white text-[#2563EB] shadow-sm font-bold' : 'text-[#64748B] hover:text-[#0F172A]'
+              }`}
+            >
+              Latest
+            </button>
+            <button
+              onClick={() => handleSortChange('popular')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                activeSort === 'popular' ? 'bg-white text-[#2563EB] shadow-sm font-bold' : 'text-[#64748B] hover:text-[#0F172A]'
+              }`}
+            >
+              Popular
+            </button>
+            <button
+              onClick={() => handleSortChange('top')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                activeSort === 'top' ? 'bg-white text-[#2563EB] shadow-sm font-bold' : 'text-[#64748B] hover:text-[#0F172A]'
+              }`}
+            >
+              Top Headlines
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center bg-[#F7FAFF] p-1 rounded-xl border border-[#E2E8F0] text-xs font-semibold text-[#0F172A]">
-          <button
-            onClick={() => handleSortChange('latest')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              activeSort === 'latest' ? 'bg-white text-[#2563EB] shadow-sm font-bold' : 'text-[#64748B] hover:text-[#0F172A]'
-            }`}
-          >
-            Latest
-          </button>
-          <button
-            onClick={() => handleSortChange('popular')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              activeSort === 'popular' ? 'bg-white text-[#2563EB] shadow-sm font-bold' : 'text-[#64748B] hover:text-[#0F172A]'
-            }`}
-          >
-            Popular
-          </button>
-          <button
-            onClick={() => handleSortChange('top')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              activeSort === 'top' ? 'bg-white text-[#2563EB] shadow-sm font-bold' : 'text-[#64748B] hover:text-[#0F172A]'
-            }`}
-          >
-            Top Headlines
-          </button>
+        {/* Freshness Filter Chips */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-[#475569] mr-1">
+            <Clock className="w-3.5 h-3.5 text-[#2563EB]" />
+            <span>Freshness:</span>
+          </div>
+          {freshnessOptions.map((opt) => {
+            const isSelected = freshness === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => handleFreshnessChange(opt.value)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
+                  isSelected
+                    ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-xs'
+                    : 'bg-white text-[#475569] border-[#E2E8F0] hover:border-[#93C5FD] hover:text-[#2563EB]'
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -183,7 +235,25 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onSelectStory, onS
       ) : error ? (
         <EmptyState title="Unable to load story intelligence" description={error} onRetry={() => loadData()} />
       ) : stories.length === 0 ? (
-        <EmptyState title="No stories available." onRetry={() => loadData()} />
+        <EmptyState
+          title={
+            freshness !== 'all'
+              ? `No stories published in the selected freshness window (${freshnessOptions.find((o) => o.value === freshness)?.label})`
+              : 'No stories available.'
+          }
+          description={
+            freshness !== 'all'
+              ? "We checked original publication timestamps, and no articles were published within this timeframe. Try selecting 'Last 24 hours' or 'All available news' to view earlier coverage."
+              : 'No news stories have been clustered yet. Try another topic or search.'
+          }
+          onRetry={() => {
+            if (freshness !== 'all') {
+              handleFreshnessChange('all');
+            } else {
+              loadData();
+            }
+          }}
+        />
       ) : (
         <>
           {/* 4. HERO FEATURED STORY CARD */}
@@ -211,13 +281,23 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onSelectStory, onS
                 {/* Hero Info (Right 5 Cols) */}
                 <div className="lg:col-span-5 p-6 sm:p-8 flex flex-col justify-between space-y-6">
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#EFF6FF] text-[#2563EB] uppercase tracking-wider border border-[#60A5FA]/20">
-                        {heroStory.topic || heroStory.category || 'Technology'}
-                      </span>
-                      <span className="text-xs text-[#64748B] font-semibold">
-                        {heroStory.article_count} {heroStory.article_count === 1 ? 'source' : 'sources'}
-                      </span>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#EFF6FF] text-[#2563EB] uppercase tracking-wider border border-[#60A5FA]/20">
+                          {heroStory.topic || heroStory.category || 'Technology'}
+                        </span>
+                        <span className="text-xs text-[#64748B] font-semibold">
+                          {heroStory.article_count} {heroStory.article_count === 1 ? 'source' : 'sources'}
+                        </span>
+                      </div>
+                      <VerificationBadge
+                        status={
+                          heroStory.overall_verification_status ||
+                          heroStory.fact_check_status ||
+                          heroStory.discrepancy_status
+                        }
+                        size="sm"
+                      />
                     </div>
 
                     <h3 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] leading-tight group-hover:text-[#2563EB] transition-colors">
@@ -230,8 +310,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onSelectStory, onS
                   </div>
 
                   <div className="pt-4 border-t border-[#E2E8F0] flex items-center justify-between">
-                    <span className="text-xs text-[#64748B] font-semibold">
-                      Updated {heroStory.latest_published_at ? new Date(heroStory.latest_published_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recently'}
+                    <span
+                      className="text-xs text-[#64748B] font-semibold cursor-help"
+                      title={getTimestampTooltip(heroStory.latest_published_at, 'Updated')}
+                    >
+                      Updated {formatRelativeTime(heroStory.latest_published_at)}
                     </span>
 
                     <button
@@ -280,44 +363,61 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onSelectStory, onS
                 <span className="text-xs text-[#64748B] font-medium">Real-time Feed</span>
               </div>
 
-              <div className="bg-[#F7FAFF] border border-[#E2E8F0] rounded-2xl p-4 divide-y divide-[#E2E8F0]">
-                {liveArticles.slice(0, 6).map((art, idx) => {
-                  const pubTime = art.published_at
-                    ? new Date(art.published_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    : 'Just now';
+              {liveArticles.length === 0 ? (
+                <div className="bg-[#F7FAFF] border border-[#E2E8F0] rounded-2xl p-6 text-center space-y-2">
+                  <Clock className="w-8 h-8 text-[#94A3B8] mx-auto mb-1" />
+                  <p className="text-xs font-bold text-[#0F172A]">No articles found in freshness window</p>
+                  <p className="text-[11px] text-[#64748B] leading-relaxed">
+                    No articles were published within {freshnessOptions.find((o) => o.value === freshness)?.label.toLowerCase()}.
+                  </p>
+                  {freshness !== 'all' && (
+                    <button
+                      onClick={() => handleFreshnessChange('all')}
+                      className="text-xs font-semibold text-[#2563EB] hover:underline pt-1 inline-block"
+                    >
+                      Show all available news
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-[#F7FAFF] border border-[#E2E8F0] rounded-2xl p-4 divide-y divide-[#E2E8F0]">
+                  {liveArticles.slice(0, 6).map((art, idx) => {
+                    const pubTime = formatRelativeTime(art.published_at);
+                    const tooltip = getTimestampTooltip(art.published_at, 'Published');
 
-                  return (
-                    <div key={idx} className="py-3.5 first:pt-1 last:pb-1 flex items-start justify-between gap-3 group">
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2 text-xs font-semibold text-[#64748B]">
-                          <span className="text-[#2563EB] font-bold">{art.source_name}</span>
-                          <span>&bull;</span>
-                          <span>{pubTime}</span>
+                    return (
+                      <div key={idx} className="py-3.5 first:pt-1 last:pb-1 flex items-start justify-between gap-3 group">
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2 text-xs font-semibold text-[#64748B]">
+                            <span className="text-[#2563EB] font-bold">{art.source_name}</span>
+                            <span>&bull;</span>
+                            <span title={tooltip} className="cursor-help">{pubTime}</span>
+                          </div>
+                          <a
+                            href={art.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-bold text-[#0F172A] group-hover:text-[#2563EB] transition-colors leading-snug block line-clamp-2"
+                          >
+                            {art.title}
+                          </a>
                         </div>
-                        <a
-                          href={art.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-bold text-[#0F172A] group-hover:text-[#2563EB] transition-colors leading-snug block line-clamp-2"
-                        >
-                          {art.title}
-                        </a>
-                      </div>
 
-                      {art.image_url && (
-                        <img
-                          src={art.image_url}
-                          alt={art.title}
-                          className="w-16 h-14 object-cover rounded-lg border border-[#E2E8F0] shrink-0"
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                        {art.image_url && (
+                          <img
+                            src={art.image_url}
+                            alt={art.title}
+                            className="w-16 h-14 object-cover rounded-lg border border-[#E2E8F0] shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 

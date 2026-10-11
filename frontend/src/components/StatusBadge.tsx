@@ -1,5 +1,16 @@
 import React from 'react';
-import { Activity, Cpu } from 'lucide-react';
+import {
+  Activity,
+  Cpu,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  HelpCircle,
+  ShieldCheck,
+  Scale,
+  MinusCircle,
+  ShieldAlert,
+} from 'lucide-react';
 
 interface StatusBadgeProps {
   apiStatus: 'online' | 'offline' | 'checking';
@@ -44,72 +55,127 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ apiStatus, isDemo = tr
   );
 };
 
-export const CredibilityBadge: React.FC<{ status?: string }> = ({ status }) => {
+export const CredibilityBadge: React.FC<{ status?: string; assessmentStatus?: string }> = ({
+  status,
+  assessmentStatus,
+}) => {
+  if (assessmentStatus === 'not_assessed' || status === 'not_assessed' || status === 'unverified_publisher') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-300">
+        <HelpCircle className="w-3 h-3 text-slate-500" />
+        <span>Publisher: Not assessed</span>
+      </span>
+    );
+  }
+
   switch (status) {
     case 'high_credibility':
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-          High Credibility
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300">
+          <ShieldCheck className="w-3 h-3 text-emerald-600" />
+          <span>High Credibility</span>
         </span>
       );
     case 'medium_credibility':
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-          Medium Credibility
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-800 border border-blue-300">
+          <ShieldCheck className="w-3 h-3 text-blue-600" />
+          <span>Medium Credibility</span>
         </span>
       );
     case 'low_credibility':
+    case 'caution_advised':
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-          Caution Advised
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-300">
+          <ShieldAlert className="w-3 h-3 text-amber-600" />
+          <span>Caution Advised</span>
         </span>
       );
     default:
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-          Unverified Publisher
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-300">
+          <HelpCircle className="w-3 h-3 text-slate-500" />
+          <span>Publisher: Not assessed</span>
         </span>
       );
   }
 };
 
-export const VerificationBadge: React.FC<{ status?: string }> = ({ status }) => {
-  switch (status) {
-    case 'verified_by_existing_fact_check':
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
-          Existing Fact-Check Found
-        </span>
-      );
-    case 'disputed_by_existing_fact_check':
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-800 border border-rose-300">
-          Disputed Claim
-        </span>
-      );
-    case 'conflicting_reports':
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
-          Conflicting Reports
-        </span>
-      );
-    case 'unanimous_consensus':
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800 border border-blue-300">
-          Unanimous Consensus
-        </span>
-      );
-    case 'single_source_only':
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-300">
-          Single Source Reporting
-        </span>
-      );
-    default:
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-50 text-slate-500 border border-slate-200">
-          No Matching Fact-Check Found
-        </span>
-      );
+export const VerificationBadge: React.FC<{ status?: string; size?: 'sm' | 'md' }> = ({
+  status = 'Not checked',
+  size = 'sm',
+}) => {
+  const norm = (status || '').toLowerCase().trim();
+  const textClass = size === 'md' ? 'text-xs px-2.5 py-1' : 'text-[10px] px-2 py-0.5';
+  const iconClass = size === 'md' ? 'w-3.5 h-3.5' : 'w-3 h-3';
+
+  if (norm.includes('true') && !norm.includes('partially') && !norm.includes('mixed')) {
+    return (
+      <span className={`inline-flex items-center gap-1 rounded font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 ${textClass}`}>
+        <CheckCircle2 className={`${iconClass} text-emerald-600`} />
+        <span>Fact-check rated TRUE</span>
+      </span>
+    );
   }
+
+  if (norm.includes('false')) {
+    return (
+      <span className={`inline-flex items-center gap-1 rounded font-bold bg-rose-50 text-rose-800 border border-rose-300 ${textClass}`}>
+        <XCircle className={`${iconClass} text-rose-600`} />
+        <span>Fact-check rated FALSE</span>
+      </span>
+    );
+  }
+
+  if (norm.includes('mixed') || norm.includes('partially')) {
+    return (
+      <span className={`inline-flex items-center gap-1 rounded font-bold bg-amber-50 text-amber-800 border border-amber-300 ${textClass}`}>
+        <Scale className={`${iconClass} text-amber-600`} />
+        <span>Mixed or partially true</span>
+      </span>
+    );
+  }
+
+  if (norm.includes('conflicting')) {
+    return (
+      <span className={`inline-flex items-center gap-1 rounded font-bold bg-orange-50 text-orange-800 border border-orange-300 ${textClass}`}>
+        <AlertTriangle className={`${iconClass} text-orange-600`} />
+        <span>Conflicting reports</span>
+      </span>
+    );
+  }
+
+  if (norm.includes('unanimous') || norm.includes('consensus')) {
+    return (
+      <span className={`inline-flex items-center gap-1 rounded font-bold bg-blue-50 text-blue-800 border border-blue-300 ${textClass}`}>
+        <CheckCircle2 className={`${iconClass} text-blue-600`} />
+        <span>Unanimous consensus</span>
+      </span>
+    );
+  }
+
+  if (norm.includes('insufficient') || norm.includes('single')) {
+    return (
+      <span className={`inline-flex items-center gap-1 rounded font-bold bg-stone-100 text-stone-700 border border-stone-300 ${textClass}`}>
+        <HelpCircle className={`${iconClass} text-stone-500`} />
+        <span>Insufficient evidence</span>
+      </span>
+    );
+  }
+
+  if (norm.includes('no matching') || norm === 'unknown') {
+    return (
+      <span className={`inline-flex items-center gap-1 rounded font-medium bg-slate-50 text-slate-700 border border-slate-300 ${textClass}`}>
+        <MinusCircle className={`${iconClass} text-slate-500`} />
+        <span>No matching fact-check found</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1 rounded font-medium bg-slate-50 text-slate-600 border border-slate-200 ${textClass}`}>
+      <HelpCircle className={`${iconClass} text-slate-400`} />
+      <span>Not checked</span>
+    </span>
+  );
 };

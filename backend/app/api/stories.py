@@ -7,19 +7,33 @@ from app.models.story import Story
 from app.models.article import Article
 from app.schemas.story import StoryResponse, StoryTimelineResponse, TimelineEvent
 
+from app.services.search import SearchService
+
 router = APIRouter(prefix="/stories", tags=["Stories & Clusters"])
 
 @router.get("", response_model=List[StoryResponse])
 def get_stories(
     topic: Optional[str] = Query(None, description="Filter stories by topic"),
+    freshness: Optional[str] = Query("all", description="Freshness filter: 1h, 6h, 24h, 7d, all"),
+    sort_by: Optional[str] = Query("latest", description="Sort by 'latest' (newest publication time) or 'updated'"),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    """Retrieve story clusters ordered by latest update."""
+    """Retrieve story clusters ordered by original publication time (or latest update) with optional freshness window."""
     query = db.query(Story).options(joinedload(Story.articles))
-    if topic:
-        query = query.filter(Story.topic.ilike(f"%{topic}%"))
-    stories = query.order_by(Story.last_updated.desc()).limit(limit).all()
+    if topic and topic.strip() and topic.strip().lower() not in ["general", "all", "news"]:
+        query = query.filter(Story.topic.ilike(f"%{topic.strip()}%"))
+
+    cutoff = SearchService.get_freshness_cutoff(freshness)
+    if cutoff:
+        query = query.filter(Story.latest_published_at.isnot(None), Story.latest_published_at >= cutoff)
+
+    # Sort strictly by newest article publication timestamp for news freshness
+    if sort_by == "updated":
+        stories = query.order_by(Story.last_updated.desc()).limit(limit).all()
+    else:
+        stories = query.order_by(Story.latest_published_at.desc()).limit(limit).all()
+
     return stories
 
 @router.get("/{story_id}", response_model=StoryResponse)

@@ -1,5 +1,6 @@
 import React from 'react';
 import { TimelineEvent } from '../types';
+import { formatISTDateTime, formatRelativeTime, getTimestampTooltip } from '../utils/time';
 import { Clock, ExternalLink, Activity } from 'lucide-react';
 
 interface TimelineProps {
@@ -38,14 +39,9 @@ export const Timeline: React.FC<TimelineProps> = ({ events }) => {
 
       <div className="relative pl-6 border-l-2 border-[#2563EB] space-y-6 pt-1">
         {sortedEvents.map((event, idx) => {
-          const formattedDate = event.published_at
-            ? new Date(event.published_at).toLocaleString([], {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })
-            : 'Earlier';
+          const formattedRelative = formatRelativeTime(event.published_at);
+          const tooltip = getTimestampTooltip(event.published_at, 'Published');
+          const istExact = event.published_at ? formatISTDateTime(event.published_at) : 'Time unavailable';
 
           const isLatest = idx === 0;
 
@@ -71,9 +67,12 @@ export const Timeline: React.FC<TimelineProps> = ({ events }) => {
                     )}
                   </div>
 
-                  <span className="text-xs text-[#64748B] font-semibold flex items-center gap-1">
+                  <span
+                    className="text-xs text-[#64748B] font-semibold flex items-center gap-1 cursor-help"
+                    title={tooltip}
+                  >
                     <Clock className="w-3.5 h-3.5 text-[#2563EB]" />
-                    {formattedDate}
+                    <span>{istExact} &bull; {formattedRelative}</span>
                   </span>
                 </div>
 

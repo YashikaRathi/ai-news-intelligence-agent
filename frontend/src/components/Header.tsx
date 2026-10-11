@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Sparkles } from 'lucide-react';
+import { Search, Sparkles, Bell } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: 'dashboard' | 'stories' | 'search' | 'intelligence' | 'topics';
@@ -8,6 +8,8 @@ interface HeaderProps {
   isDemo?: boolean;
   onCategorySelect?: (category: string) => void;
   selectedCategory?: string;
+  unreadCount?: number;
+  onOpenNotifications?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,6 +18,8 @@ export const Header: React.FC<HeaderProps> = ({
   apiStatus,
   onCategorySelect,
   selectedCategory = '',
+  unreadCount = 0,
+  onOpenNotifications,
 }) => {
   const navItems = [
     { label: 'Home', tab: 'dashboard' as const },
@@ -25,7 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   return (
-    <header className="bg-white border-b border-[#E2E8F0] sticky top-0 z-50 shadow-sm">
+    <header className="bg-white border-b border-[#E2E8F0] sticky top-0 z-40 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Left: Brand Logo */}
@@ -37,7 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
             }}
             className="cursor-pointer flex items-center gap-2 group"
           >
-            <div className="w-8 h-8 rounded-lg bg-[#2563EB] text-white flex items-center justify-center font-bold text-sm shadow-sm group-hover:bg-[#1D4ED8] transition-colors">
+            <div className="w-8 h-8 rounded-lg bg-[#2563EB] text-white flex items-center justify-center font-bold text-sm shadow-xs group-hover:bg-[#1D4ED8] transition-colors">
               <Sparkles className="w-4 h-4 fill-white text-white" />
             </div>
             <div>
@@ -74,18 +78,35 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
         </div>
 
-        {/* Right: Quick Search Button & Live Status */}
-        <div className="flex items-center gap-3">
+        {/* Right: Notification Bell, Search Trigger, & Live Status */}
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Subtle Live Badge */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F7FAFF] border border-[#E2E8F0] text-xs font-semibold text-[#64748B]">
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F7FAFF] border border-[#E2E8F0] text-xs font-semibold text-[#64748B]">
             <span className={`w-2 h-2 rounded-full ${apiStatus === 'online' ? 'bg-[#16A34A] animate-pulse' : 'bg-slate-400'}`}></span>
             <span className="text-[11px] uppercase tracking-wider">{apiStatus === 'online' ? 'Live' : 'Syncing'}</span>
           </div>
 
+          {/* Notification Bell Button */}
+          {onOpenNotifications && (
+            <button
+              onClick={onOpenNotifications}
+              className="relative p-2 rounded-lg bg-[#F7FAFF] hover:bg-[#EFF6FF] border border-[#E2E8F0] text-[#64748B] hover:text-[#2563EB] transition-all shadow-xs"
+              title="View in-app notifications"
+              aria-label="Notifications"
+            >
+              <Bell className="w-4 h-4" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#2563EB] text-white text-[10px] font-extrabold flex items-center justify-center border-2 border-white animate-pulse">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+          )}
+
           {/* Search Trigger */}
           <button
             onClick={() => setActiveTab('search')}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#F7FAFF] hover:bg-[#EFF6FF] border border-[#E2E8F0] text-[#64748B] hover:text-[#2563EB] text-xs font-semibold transition-all shadow-sm"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#F7FAFF] hover:bg-[#EFF6FF] border border-[#E2E8F0] text-[#64748B] hover:text-[#2563EB] text-xs font-semibold transition-all shadow-xs"
           >
             <Search className="w-4 h-4 text-[#2563EB]" />
             <span className="hidden sm:inline">Search</span>
@@ -95,6 +116,3 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
-
-
-

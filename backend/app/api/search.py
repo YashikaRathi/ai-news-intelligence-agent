@@ -1,6 +1,6 @@
 import logging
 from fastapi import APIRouter, Depends, Query
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
@@ -14,6 +14,8 @@ from app.services.ingestion import IngestionService
 from app.services.deduplication import DeduplicationService
 from app.services.clustering import ClusteringService
 
+from app.services.search import SearchService
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/search", tags=["Search"])
@@ -21,10 +23,13 @@ router = APIRouter(prefix="/search", tags=["Search"])
 ingestion_service = IngestionService()
 dedup_service = DeduplicationService()
 clustering_service = ClusteringService()
+search_service = SearchService()
 
 @router.get("")
 async def search_news(
     q: str = Query(..., min_length=1, description="Search query string"),
+    freshness: Optional[str] = Query("all", description="Freshness filter: 1h, 6h, 24h, 7d, all"),
+    sort_by: Optional[str] = Query("relevance", description="Sort by 'relevance' or 'latest'"),
     limit: int = Query(20, ge=1, le=50),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
@@ -33,6 +38,8 @@ async def search_news(
     if not clean_query:
         return {
             "query": q,
+            "freshness": freshness or "all",
+            "sort_by": sort_by or "relevance",
             "article_count": 0,
             "story_count": 0,
             "articles": [],
@@ -98,7 +105,7 @@ async def search_news(
                         id=s_id,
                         title=s_data["title"],
                         summary=s_data.get("summary", ""),
-                        topic=clean_query,
+                        topic=s_data.get("topic") or "General",
                         category=s_data.get("category", "General"),
                         first_seen=s_data.get("first_seen"),
                         last_updated=s_data.get("last_updated"),
@@ -127,7 +134,7 @@ async def search_news(
                         author=a_data.get("author"),
                         image_url=a_data.get("image_url"),
                         published_at=a_data.get("published_at"),
-                        topic=a_data.get("topic") or clean_query,
+                        topic=a_data.get("topic") or "General",
                         is_duplicate=a_data.get("is_duplicate", False),
                         duplicate_of_id=a_data.get("duplicate_of_id"),
                         story_id=a_data.get("story_id"),
@@ -140,42 +147,13 @@ async def search_news(
     except Exception as exc:
         logger.warning(f"Live news discovery during search failed ({exc}). Falling back to local database search.")
 
-    # 8. Query SQLite database for matching articles and stories
-    keywords = [w.strip() for w in clean_query.split() if len(w.strip()) > 1]
-
-    art_filters = [
-        Article.title.ilike(f"%{clean_query}%"),
-        Article.description.ilike(f"%{clean_query}%"),
-        Article.source_name.ilike(f"%{clean_query}%"),
-        Article.topic.ilike(f"%{clean_query}%")
-    ]
-    for kw in keywords:
-        art_filters.append(Article.title.ilike(f"%{kw}%"))
-        art_filters.append(Article.description.ilike(f"%{kw}%"))
-
-    matched_articles = (
-        db.query(Article)
-        .filter(or_(*art_filters))
-        .order_by(Article.published_at.desc())
-        .limit(limit)
-        .all()
-    )
-
-    story_filters = [
-        Story.title.ilike(f"%{clean_query}%"),
-        Story.summary.ilike(f"%{clean_query}%"),
-        Story.topic.ilike(f"%{clean_query}%")
-    ]
-    for kw in keywords:
-        story_filters.append(Story.title.ilike(f"%{kw}%"))
-        story_filters.append(Story.summary.ilike(f"%{kw}%"))
-
-    matched_stories = (
-        db.query(Story)
-        .filter(or_(*story_filters))
-        .order_by(Story.last_updated.desc())
-        .limit(limit)
-        .all()
+    # 8. Precision Query Relevance Engine & Ranking
+    matched_articles, matched_stories = search_service.search_articles_and_stories(
+        db=db,
+        query=clean_query,
+        limit=limit,
+        freshness=freshness,
+        sort_by=sort_by
     )
 
     article_responses = [ArticleResponse.model_validate(art) for art in matched_articles]
@@ -183,6 +161,8 @@ async def search_news(
 
     return {
         "query": q,
+        "freshness": freshness or "all",
+        "sort_by": sort_by or "relevance",
         "article_count": len(article_responses),
         "story_count": len(story_responses),
         "articles": article_responses,

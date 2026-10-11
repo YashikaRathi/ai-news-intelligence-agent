@@ -83,14 +83,19 @@ def get_demo_articles(topic: str = "artificial intelligence") -> List[Dict[str, 
         }
     ]
 
-    if not topic or topic.lower() in ["general", "all", "news"]:
+    import re
+    topic_clean = topic.strip().lower()
+    if not topic_clean or topic_clean in ["general", "all", "news"]:
         return raw_demo
 
-    filtered = [
-        a for a in raw_demo
-        if topic.lower() in a["title"].lower()
-        or topic.lower() in a.get("description", "").lower()
-        or topic.lower() in a.get("topic", "").lower()
-    ]
+    topic_words = [w for w in re.split(r'\W+', topic_clean) if len(w) > 2]
 
-    return filtered if filtered else raw_demo
+    filtered = []
+    for a in raw_demo:
+        combined = f"{a['title']} {a.get('description', '')} {a.get('topic', '')}".lower()
+        if topic_clean in combined:
+            filtered.append(a)
+        elif topic_words and any(w in combined for w in topic_words):
+            filtered.append(a)
+
+    return filtered

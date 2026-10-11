@@ -13,17 +13,26 @@ class ClusteringService:
 
 
     @staticmethod
-    def _to_naive_datetime(dt_val: Any) -> datetime:
-        """Helper to ensure datetime objects are timezone-naive for consistent SQLite comparison."""
+    def _to_naive_datetime(dt_val: Any) -> Optional[datetime]:
+        """Convert datetime or ISO string to naive UTC datetime for consistent SQLite comparisons."""
+        if dt_val is None:
+            return None
         if isinstance(dt_val, str):
+            clean_str = dt_val.strip()
+            if not clean_str:
+                return None
             try:
-                dt = datetime.fromisoformat(dt_val.replace("Z", "+00:00"))
+                dt = datetime.fromisoformat(clean_str.replace("Z", "+00:00"))
+                if dt.tzinfo is not None:
+                    dt = dt.astimezone(timezone.utc)
                 return dt.replace(tzinfo=None)
             except Exception:
-                return datetime.utcnow()
+                return None
         if isinstance(dt_val, datetime):
+            if dt_val.tzinfo is not None:
+                dt_val = dt_val.astimezone(timezone.utc)
             return dt_val.replace(tzinfo=None)
-        return datetime.utcnow()
+        return None
 
     def compute_story_similarity(self, article: Dict[str, Any], story: Dict[str, Any]) -> float:
         """Calculate similarity between an article and a story's representative title and content."""
@@ -73,22 +82,24 @@ class ClusteringService:
                 target_story["article_count"] = target_story.get("article_count", 0) + 1
                 
                 # Normalize existing story timestamps for naive comparison
-                earliest = self._to_naive_datetime(target_story.get("earliest_published_at")) if target_story.get("earliest_published_at") else pub_time
-                latest = self._to_naive_datetime(target_story.get("latest_published_at")) if target_story.get("latest_published_at") else pub_time
+                earliest = self._to_naive_datetime(target_story.get("earliest_published_at"))
+                latest = self._to_naive_datetime(target_story.get("latest_published_at"))
 
-                # Update story timeline bounds
-                if pub_time < earliest:
-                    target_story["earliest_published_at"] = pub_time
-                if pub_time > latest:
-                    target_story["latest_published_at"] = pub_time
+                # Update story timeline bounds if pub_time is available
+                if pub_time is not None:
+                    if earliest is None or pub_time < earliest:
+                        target_story["earliest_published_at"] = pub_time
+                    if latest is None or pub_time > latest:
+                        target_story["latest_published_at"] = pub_time
 
-                target_story["last_updated"] = datetime.utcnow()
+                target_story["last_updated"] = datetime.now(timezone.utc).replace(tzinfo=None)
 
             else:
                 # Create a new Story cluster
                 new_story_id = f"story_{uuid.uuid4().hex[:12]}"
                 article["story_id"] = new_story_id
 
+                now_utc_naive = datetime.now(timezone.utc).replace(tzinfo=None)
                 new_story = {
                     "id": new_story_id,
                     "title": article["title"],
@@ -96,8 +107,8 @@ class ClusteringService:
                     "summary": article.get("description", ""),
                     "topic": article.get("topic", "General"),
                     "category": article.get("topic", "General"),
-                    "first_seen": datetime.utcnow(),
-                    "last_updated": datetime.utcnow(),
+                    "first_seen": now_utc_naive,
+                    "last_updated": now_utc_naive,
                     "earliest_published_at": pub_time,
                     "latest_published_at": pub_time,
                     "article_count": 1,

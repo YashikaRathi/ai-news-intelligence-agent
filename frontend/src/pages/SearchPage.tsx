@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { SearchResult } from '../types';
+import { SearchResult, FreshnessOption } from '../types';
 import { searchNews } from '../services/api';
 import { SearchBar } from '../components/SearchBar';
 import { StoryCard } from '../components/StoryCard';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { EmptyState } from '../components/EmptyState';
-import { ExternalLink, Clock } from 'lucide-react';
+import { formatRelativeTime, getTimestampTooltip } from '../utils/time';
+import { ExternalLink, Clock, ArrowUpDown } from 'lucide-react';
 
 
 interface SearchPageProps {
@@ -15,16 +16,30 @@ interface SearchPageProps {
 
 export const SearchPage: React.FC<SearchPageProps> = ({ initialQuery = 'AI', onSelectStory }) => {
   const [query, setQuery] = useState(initialQuery);
+  const [freshness, setFreshness] = useState<FreshnessOption>('all');
+  const [sortBy, setSortBy] = useState<'relevance' | 'latest'>('relevance');
   const [result, setResult] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const executeSearch = async (qStr: string) => {
+  const freshnessOptions: { label: string; value: FreshnessOption }[] = [
+    { label: 'All available news', value: 'all' },
+    { label: 'Last hour', value: '1h' },
+    { label: 'Last 6 hours', value: '6h' },
+    { label: 'Last 24 hours', value: '24h' },
+    { label: 'Last 7 days', value: '7d' },
+  ];
+
+  const executeSearch = async (
+    qStr: string,
+    fOpt: FreshnessOption = freshness,
+    sOpt: 'relevance' | 'latest' = sortBy
+  ) => {
     if (!qStr.trim()) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await searchNews(qStr.trim());
+      const data = await searchNews(qStr.trim(), 20, fOpt, sOpt);
       setResult(data);
     } catch (err: any) {
       setError(err.message || 'Search request failed.');
@@ -34,28 +49,95 @@ export const SearchPage: React.FC<SearchPageProps> = ({ initialQuery = 'AI', onS
   };
 
   useEffect(() => {
-    executeSearch(query);
+    executeSearch(query, freshness, sortBy);
   }, []);
 
   const handleSearchSubmit = (q: string) => {
     setQuery(q);
-    executeSearch(q);
+    executeSearch(q, freshness, sortBy);
+  };
+
+  const handleFreshnessChange = (newFreshness: FreshnessOption) => {
+    setFreshness(newFreshness);
+    executeSearch(query, newFreshness, sortBy);
+  };
+
+  const handleSortChange = (newSort: 'relevance' | 'latest') => {
+    setSortBy(newSort);
+    executeSearch(query, freshness, newSort);
   };
 
   return (
     <div className="space-y-8 pb-12 max-w-7xl mx-auto">
       {/* Search Header Banner */}
-      <div className="bg-[#F7FAFF] border border-[#E2E8F0] rounded-2xl p-6 sm:p-8 space-y-4 shadow-sm">
+      <div className="bg-[#F7FAFF] border border-[#E2E8F0] rounded-2xl p-6 sm:p-8 space-y-5 shadow-sm">
         <div>
           <h2 className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight">
             Search News Intelligence
           </h2>
           <p className="text-xs sm:text-sm text-[#64748B] font-medium mt-1">
-            Search topics, companies, people, or events across live news feeds
+            Search topics, companies, people, or events across live news feeds with freshness filtering
           </p>
         </div>
         <div className="max-w-2xl">
           <SearchBar onSearch={handleSearchSubmit} initialQuery={query} />
+        </div>
+
+        {/* Filters and Sorting Controls Bar */}
+        <div className="pt-2 border-t border-[#E2E8F0] flex flex-wrap items-center justify-between gap-4">
+          {/* Freshness Filter */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#475569] mr-1">
+              <Clock className="w-3.5 h-3.5 text-[#2563EB]" />
+              <span>Freshness:</span>
+            </div>
+            {freshnessOptions.map((opt) => {
+              const isSelected = freshness === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => handleFreshnessChange(opt.value)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
+                    isSelected
+                      ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-xs'
+                      : 'bg-white text-[#475569] border-[#E2E8F0] hover:border-[#93C5FD] hover:text-[#2563EB]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Sort Switcher */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-[#475569] flex items-center gap-1">
+              <ArrowUpDown className="w-3.5 h-3.5 text-[#2563EB]" />
+              <span>Sort:</span>
+            </span>
+            <div className="flex items-center bg-white p-1 rounded-xl border border-[#E2E8F0] text-xs font-semibold">
+              <button
+                onClick={() => handleSortChange('relevance')}
+                className={`px-3 py-1 rounded-lg transition-all ${
+                  sortBy === 'relevance'
+                    ? 'bg-[#2563EB] text-white shadow-xs font-bold'
+                    : 'text-[#64748B] hover:text-[#0F172A]'
+                }`}
+              >
+                Relevance
+              </button>
+              <button
+                onClick={() => handleSortChange('latest')}
+                className={`px-3 py-1 rounded-lg transition-all ${
+                  sortBy === 'latest'
+                    ? 'bg-[#2563EB] text-white shadow-xs font-bold'
+                    : 'text-[#64748B] hover:text-[#0F172A]'
+                }`}
+              >
+                Newest first (Publication)
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -64,7 +146,25 @@ export const SearchPage: React.FC<SearchPageProps> = ({ initialQuery = 'AI', onS
       ) : error ? (
         <EmptyState title="Search Failed" description={error} onRetry={() => executeSearch(query)} />
       ) : !result || (result.stories.length === 0 && result.articles.length === 0) ? (
-        <EmptyState title="No news found." description={`No records matched '${query}'. Try searching another query.`} />
+        <EmptyState
+          title={
+            freshness !== 'all'
+              ? `No news found in the '${freshnessOptions.find((o) => o.value === freshness)?.label}' window.`
+              : 'No news found.'
+          }
+          description={
+            freshness !== 'all'
+              ? `No articles or stories matching "${query}" were published within this freshness timeframe. Try selecting 'All available news' or 'Last 24 hours'.`
+              : `No records matched '${query}'. Try searching another query or topic.`
+          }
+          onRetry={() => {
+            if (freshness !== 'all') {
+              handleFreshnessChange('all');
+            } else {
+              executeSearch(query);
+            }
+          }}
+        />
       ) : (
         <div className="space-y-10">
           {/* Search Result Count */}
@@ -109,9 +209,12 @@ export const SearchPage: React.FC<SearchPageProps> = ({ initialQuery = 'AI', onS
                           {art.source_name}
                         </span>
                         <span>&bull;</span>
-                        <span className="flex items-center gap-1">
+                        <span
+                          className="flex items-center gap-1 cursor-help"
+                          title={getTimestampTooltip(art.published_at, 'Published')}
+                        >
                           <Clock className="w-3 h-3 text-[#2563EB]" />
-                          {art.published_at ? new Date(art.published_at).toLocaleDateString() : 'Recent'}
+                          <span>{formatRelativeTime(art.published_at)}</span>
                         </span>
                       </div>
                       <a

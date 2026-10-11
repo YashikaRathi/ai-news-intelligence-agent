@@ -22,8 +22,10 @@ class StoryResponse(StoryBase):
     latest_published_at: Optional[datetime] = None
     article_count: int
     is_demo_data: bool = False
-    discrepancy_status: Optional[str] = "insufficient_evidence"
-    fact_check_status: Optional[str] = "not_checked"
+    discrepancy_status: Optional[str] = "Insufficient evidence"
+    fact_check_status: Optional[str] = "Not checked"
+    overall_verification_status: Optional[str] = "Not checked"
+    status_reason: Optional[str] = None
     articles: List[ArticleResponse] = []
 
     model_config = ConfigDict(from_attributes=True)

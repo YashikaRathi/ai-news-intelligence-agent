@@ -8,12 +8,38 @@ from app.db.base import Base
 import app.models  # Ensures models are registered with Base
 
 from app.schemas.health import HealthResponse
-from app.api import news_router, stories_router, search_router, ai_router, verification_router
+from app.api import (
+    news_router,
+    stories_router,
+    search_router,
+    ai_router,
+    verification_router,
+    reviews_router,
+    notifications_router,
+)
 
 load_dotenv()
 
-# Create SQLite tables on app startup for MVP
+# Create SQLite tables on app startup
 Base.metadata.create_all(bind=engine)
+
+def _ensure_sqlite_columns():
+    """Ensure newly added columns exist in existing SQLite database tables without data loss."""
+    try:
+        with engine.connect() as conn:
+            result = conn.exec_driver_sql("PRAGMA table_info(articles)")
+            existing_cols = {row[1] for row in result.fetchall()}
+            if "source_updated_at" not in existing_cols:
+                conn.exec_driver_sql("ALTER TABLE articles ADD COLUMN source_updated_at DATETIME")
+            if "ingested_at" not in existing_cols:
+                conn.exec_driver_sql("ALTER TABLE articles ADD COLUMN ingested_at DATETIME")
+            if "verified_at" not in existing_cols:
+                conn.exec_driver_sql("ALTER TABLE articles ADD COLUMN verified_at DATETIME")
+            conn.commit()
+    except Exception:
+        pass
+
+_ensure_sqlite_columns()
 
 app = FastAPI(
     title="AI News Intelligence Agent API",
@@ -58,6 +84,8 @@ app.include_router(stories_router, prefix="/api")
 app.include_router(search_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
 app.include_router(verification_router, prefix="/api")
+app.include_router(reviews_router, prefix="/api")
+app.include_router(notifications_router, prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn
